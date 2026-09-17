@@ -18,7 +18,7 @@ Our team name is Bugs26. You will see it on GitHub and in Slack. The team is div
 |---|---|---|
 | Software Systems | Raveena, Zhouran | `#bugs26-systems` |
 | Input Evaluation | Julian, Lurui | `#bugs26-evaluators` |
-| Claim Investigation | Boyu, Qinue | `#bugs26-investigators` |
+| Claim Investigation | Boyu, Qinyue | `#bugs26-investigators` |
 | Integration | Andy, Meshaal | `#bugs26-integrators` |
 | Writing | Raveena, Andy | `#bugs26-writers` |
 
