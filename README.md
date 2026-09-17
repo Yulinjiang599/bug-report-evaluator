@@ -61,6 +61,7 @@ Each subsystem posts a short written update in `#bugs26` every week, before its 
 - [The branch rules](.github/rulesets/README.md) describe exactly what is enforced.
 - New to GitHub or to open source? Read the [Open Resource Library](https://www.openresourcelibrary.com/), curated by colleagues at the University of Vermont.
 
+## How we work
 
 - Be kind to each other.
 - Expect 10 to 15 hours per week for 3 credits, or 15 to 20 hours for 4 credits. Reading, meeting, and discussing count as work.
