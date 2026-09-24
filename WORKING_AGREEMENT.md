@@ -1,115 +1,68 @@
-# 🤝 Team Working Agreement
+
+  <h1 align="center">🤝 Team Working Agreement</h1>
 
 <table>
-  <tr>
-    <td><strong>Team</strong></td>
-    <td>Team Evaluator</td>
-  </tr>
-  <tr>
-    <td><strong>Members</strong></td>
-    <td>
-      Yulin Jiang — GitHub: <code>Yulinjiang599</code> — Time Zone: ET<br>
-      Lurui — GitHub: <code>[add username]</code> — Time Zone: ET
-    </td>
-  </tr>
-  <tr>
-    <td><strong>Date Agreed</strong></td>
-    <td>[add date]</td>
-  </tr>
+<tr>
+<td><strong>Team:</strong></td>
+<td>Input Evaluation</td>
+</tr>
+<tr>
+<td><strong>Members:</strong></td>
+<td>
+Julian Jiang,Yulinjiang599, ET (America/New_York)<br>
+Lurui Zheng, lz668-zlr, ET (America/New_York)
+</td>
+</tr>
+<tr>
+<td><strong>Date agreed:</strong></td>
+<td>Sep 23, 2026</td>
+</tr>
 </table>
 
 ---
 
-## 📅 Meetings and Availability
+## 📅 Meetings and availability
 
-| Item | Agreement |
-|---|---|
-| **Advisor check-in** | Wednesday, 2:30–3:00 PM ET |
-| **Additional team meeting** | [Add cadence, day/time, video/in-person] |
-| **Core overlap hours** | [Add agreed overlap hours] |
-| **Response time** | Within **24 hours on weekdays** |
+- Our weekly check-in with the advisor is: Every Wednesday, 2:30–3:00 p.m. Eastern Time (ET).
+- Our team meets (beyond the check-in): Every Wednesday, 3:00-4:00pm, in person, Eastern Time (ET).
+- Our core overlap hours (when everyone, including distance members, can be reached live) are: Every Wednesday, 3:00-4:00pm, in person, Eastern Time (ET).
+- Outside overlap hours, we expect responses within: 24 hours on weekdays
 
 ---
 
 ## 💬 Communication
 
-**Day-to-day discussion**  
-Slack channel or direct messages between team members.
-
-**Decisions and rationale**  
-Decisions and their reasons are recorded in the relevant **GitHub issue or pull request**. Major subsystem decisions are also summarized in repository documentation so that anyone who missed a live conversation can catch up without asking.
-
-**Work-in-progress questions**  
-Technical details go in the relevant **GitHub issue or pull request**. Slack is used for quick questions and requests for help.
+- Day-to-day discussion happens in: Our subsystem Slack channel.
+- Decisions and their reasons are recorded in: GitHub issues or pull requests, with significant decisions documented in decision records in the repository, so that anyone who missed a live conversation can catch up without asking.
+- Work-in-progress questions go to: Our subsystem Slack channel or the relevant GitHub issue.
 
 ---
 
-## 🧭 How We Make Decisions
+## 🧭 How we make decisions
 
-### Routine decisions
-
-The person doing the work proposes an approach and explains it in the relevant issue or pull request. The other member can ask questions and provide feedback during review.
-
-### Decisions affecting interfaces or difficult-to-reverse decisions
-
-We will:
-
-1. Discuss the decision together.
-2. Consult affected teams when necessary.
-3. Compare alternatives against subsystem requirements and available evidence.
-4. Record the agreed approach **before implementation**.
-
-This includes changes to:
-
-- Input formats
-- Output formats
-- Evaluation criteria
-- Interfaces with other subsystems
-
-### If we cannot agree
-
-We compare the available options against subsystem requirements and evidence. If discussion does not resolve the issue, we ask the advisor for guidance and record the final outcome.
+- For routine decisions: Whoever does the work proposes the approach and documents it in the relevant issue or pull request.
+- For decisions that affect interfaces with other teams or are hard to reverse: We discuss them with our team and any affected subsystem before proceeding, and document the outcome in a decision record.
+- If we can't agree: We timebox the discussion to one meeting, then vote on decisions within our team. If the vote is tied or the issue involves unresolved disagreement with another subsystem, we ask the advisor for guidance.
 
 ---
 
-## 🆘 How We Handle Being Stuck
+## 🆘 How we handle being stuck
 
-> **Three-Day Rule:** Anyone blocked for three days must ask for help.
-
-Before reaching three days, blockers should be raised during team meetings or through Slack as soon as they appear.
-
-When raising a blocker, we should explain:
-
-- What we are trying to accomplish
-- What we have already tried
-- What is preventing progress
-- What help we need
-- Whether another task depends on the result
-
-### If a teammate goes quiet
-
-We first reach out directly and check whether they need support.
-
-If there is no response after **two weekdays** and project work is affected, we contact the advisor and agree on next steps.
+- Per the three-day rule, anyone blocked for three days must ask for help.
+- Before that, we check in on blockers: At every team meeting and through Slack whenever help is needed.
+- If a teammate goes quiet, we: Reach out directly first to check on them, then raise the issue with the team if there is no response and work is affected.
 
 ---
 
-## 🛠️ Work and Credit
+## 🛠️ Work and credit
 
-### Dividing work
+- We divide work by: Volunteering during planning, considering each member's availability and interests, and rotating less popular tasks. Each task has a clear owner and an agreed target date.
+- Pull requests are reviewed by: At least one other team member, with an initial review expected within two working days. New commits require renewed approval, and all review comments must be resolved before merging.
+- If someone's circumstances change (illness, interviews, workload), they tell the team as early as possible, and we rebalance rather than resent.
 
-We divide work into small tasks based on:
+---
 
-- Availability
-- Interests
-- Learning goals
-- Current project needs
+## 🔄 Feedback
 
-Each task should have an **owner** and **target date** in GitHub.
-
-Both members share responsibility for documentation, testing, and coordination, and both review the overall subsystem requirements and interfaces.
-
-### Pull Request workflow
-
-```text
-Task → Branch → Implementation → Pull Request → Review → Approval → Merge
+- We give each other kind, honest feedback: a 30-minutes retrospective at the end of each week's meeting --> Wednesday, 4:00-4:30pm, in person, Eastern Time (ET).
+- Peer evaluations should never contain surprises. If something would show up in a peer evaluation, we say it to each other first.
