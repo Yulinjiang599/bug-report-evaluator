@@ -1,264 +1,628 @@
 # Input Evaluation Subsystem Requirements
 
-**Milestone:** Gate Review 2 revision  
-**Status:** Review draft. Not ready to baseline until the open items in Section 9 are resolved.  
-**Owners:** Julian Jiang (`Yulinjiang599`); Lurui Zheng (`lz668-zlr`)  
-**Governing system requirements:** [System Requirements (R1-R9)](https://docs.google.com/document/d/16a4n3GOQUCMJNqrWSI4KCzBsWQk-W8XhA2J3N4qtpGE/edit?tab=t.0). Draft, no version identifier; content reviewed on 2026-10-29. The system requirements are being revised as part of the Gate 1 rework and are not yet baselined (OI-1).
+**Milestone:** Gate 2 Revision  
+**Status:** Final Draft for Baseline Review
 
-## 1. Purpose and Boundary
+---
 
-Integration receives bug reports from GitHub and sends the original and structured report to Input Evaluation.
+# 1. Purpose and Scope
 
-Input Evaluation is responsible for:
+The Input Evaluation subsystem evaluates incoming bug reports against the published quality criteria, identifies checkable claims, preserves information required for traceability and downstream investigation, and produces outputs that support system-level evaluation.
 
-1. evaluating the report against the published quality criteria;
-2. identifying checkable claims;
-3. preserving the source context needed to inspect and investigate its outputs; and
-4. returning findings and investigation requests to Integration.
+This document specifies **what the Input Evaluation subsystem is required to accomplish**.
 
-Integration routes investigation requests to Claim Investigation and combines subsystem findings for the maintainer-facing output. Claim Investigation checks identified claims against public project artifacts.
+Implementation choices such as subsystem routing, identifiers, data schemas, algorithms, model selection, prompts, storage mechanisms, and concrete field names are treated as **design or interface decisions**, not subsystem requirements.
 
-This document flows Input Evaluation requirements down from the subsystem allocations in the current system requirements. It does not create new customer needs. The customer justification for the system-level requirements belongs in the system ConOps and system-requirements record (OI-2).
+---
 
-## 2. Requirement and Design Rule
+# 2. Definitions
 
-A **requirement** states an externally observable result that Input Evaluation must produce, regardless of implementation.
+An **input report** is a bug report received by the Input Evaluation subsystem.
 
-A **design decision** states how the team currently plans to produce that result.
+An **accepted report** is an input report that satisfies all conditions designated as required for evaluation by the approved Input Evaluation input-interface contract.
 
-Example:
+A **criterion finding** is the evaluation outcome for one published quality criterion.
 
-- Requirement: each identified claim has a unique identifier and is traceable to its source report and source passage.
-- Design: a `claim_id` field and JSON records preserve that association.
+An **evidence basis** is inspectable information from the originating report, or an inspectable determination that information required by a criterion is absent.
 
-Changing the field name or data format does not change the requirement as long as identifier uniqueness and traceability are preserved.
+An **unevaluated criterion** is a quality criterion for which the subsystem cannot produce a substantive evaluation conclusion from the available input.
 
-Verification methods follow the four standard methods: test, analysis, inspection, and demonstration.
+An **identified claim** is a checkable claim recognized in an input report for downstream investigation.
 
-## 3. Key Terms
+An **investigation package** consists of an identified claim and the report information required by the approved downstream interface contract for that claim to be interpreted and investigated.
 
-Terms marked "system" are taken from the system-level definitions in [system-requirements.md](system-requirements.md). The others are defined here for this subsystem.
+**Traceability** is the ability to associate an output unambiguously with the originating report and source content from which it was derived.
 
-- **Checkable claim (system):** A statement in a report that can be confirmed or refuted using the project's public artifacts (code, version history, documentation, prior issues).
-- **Finding (system):** A single statement the system makes about a report.
-- **Historical evaluation (system):** A measurement of accuracy on bug reports whose outcomes are already known, drawn from at least three open source projects that differ in size and application domain. In this document, the historical evaluation set means the reports and human reference labels used for that measurement.
-- **Processable report:** A report that satisfies the required conditions of the approved Integration-to-Input Evaluation interface contract.
-- **Contract-invalid input:** An input that violates one or more required conditions of that interface contract. Contract-invalid inputs are handled by IE8.
-- **Criterion finding:** Input Evaluation's result for one published quality criterion. A criterion finding contains either a conclusion or an explicit unevaluated outcome with a reason.
-- **Unevaluated criterion:** A criterion for which Input Evaluation cannot reach a conclusion from the available processable input. This is different from concluding that required information is missing, which is a conclusion. The mapping of the published rating scale (P, M, N/A, U) to concluded and unevaluated outcomes is an open item (OI-10).
-- **Evidence basis:** The inspectable evidence items or source references cited by a criterion finding. For a conclusion that information is present, it is the report content that supports the conclusion. For a conclusion that information is missing, it is an explanation of what required information was sought and a reference to where it was expected. For an unevaluated outcome, it is a reference to the content that could not be evaluated.
-- **Identified claim:** A checkable claim recognized by Input Evaluation for downstream investigation.
-- **Investigation request:** The information Input Evaluation provides for downstream investigation: one or more identified claims together with the report context required by the approved downstream interface.
+A **contract-invalid input** is an input that does not satisfy one or more conditions designated as required by the approved Input Evaluation input-interface contract.
 
-## 4. System-to-Subsystem Flow-Down
+A **style-variation pair** consists of two reports with the same intended technical content but different formatting, grammar, or writing style.
 
-Each row below cites a subsystem allocation stated in the governing system requirements.
+An **identity-variation pair** consists of two reports with the same technical content but different reporter-identifying information.
 
-| System-level source | Why Input Evaluation carries this behavior | Input Evaluation requirement |
-|---|---|---|
-| R1, R1.1, R1.2: evaluate every report; one finding per criterion; identify criterion ID and criteria version | The R1 allocation assigns criterion evaluation to Input Evaluation. | IE1 (processable reports), IE8 (all other inputs) |
-| R3, R3.1: every finding cites evidence; every evidence item matches its source | The R3 allocation requires Input Evaluation to cite evidence for each criterion finding. R3.1 applies to every evidence item the system outputs. | IE2 |
-| R4, R4.1-R4.3: state what could not be checked, why, and when nothing remains unchecked | The R4 allocation assigns unevaluated-criterion reporting to Input Evaluation. | IE3 |
-| R7.1: identify at least 80% of labeled checkable claims | The R7 allocation assigns the 80% claim-identification target to Input Evaluation. | IE4 |
-| R7: assign a unique claim identifier and preserve claim text, source, project, context, and named version | The R7 allocation assigns this to Input Evaluation. Claim Investigation cannot interpret or return a result for a claim that has lost its source context. | IE5 |
-| R2, R2.1: deliver every finding for the report | The R2 allocation requires Input Evaluation to provide all criterion findings to Integration. | IE6 |
-| R7: provide each investigation request and its context to Integration | The R7 allocation requires Input Evaluation to provide investigation requests to Integration for transfer to Claim Investigation. | IE7 |
-| R8: return an explicit error or unevaluated result for unprocessable input | The R8 allocation assigns input validation to Input Evaluation. | IE8 |
-| R8: consistent findings across style variation | The R8 allocation references a threshold in R9.3, which defines provenance instead. | Deferred; see Section 8.1 |
-| R6: no record associating one reporter with more than one submission | The R6 allocation assigns this to Input Evaluation for its own records. | IE9 |
-| R6: same findings when reporter identity is replaced with placeholders | The R6 allocation references a threshold in R6.1, which does not exist. | Deferred; see Section 8.2 |
-| R5, R5.1-R5.3: system accuracy, coverage, and negative-finding correctness | The R5 allocation requires Input Evaluation findings to be comparable with the human-labeled historical set. | IE10 |
-| R9.3: record versions used to produce each output | The R9 allocation requires Input Evaluation to record the criteria version and every external model version. | IE11 |
+---
 
-Input Evaluation will update this flow-down if the system requirements change before they are baselined.
+# 3. Subsystem Requirements
 
-## 5. Input Evaluation Requirements
+The IE1–IE7 headings organize the major Input Evaluation capabilities.
 
-### IE1 - Complete Criterion Evaluation
+Each numbered requirement represents one independently verifiable subsystem obligation.
 
-**Parent:** R1, R1.1, R1.2  
-**Requirement:** For each processable report, Input Evaluation shall produce exactly one criterion finding for every published quality criterion. Each finding shall identify the criterion ID and the version of the quality criteria used.  
-**Method:** Test  
-**Verification:** Run the approved criterion test set (E11) and compare each output with the versioned criterion list (E4).  
-**Pass:** Every processable test report has exactly one finding per published criterion, and every finding contains the correct criterion ID and criteria version.
+---
 
-R1 applies to every incoming report. A report that is not processable receives an explicit non-normal outcome under IE8. Together, IE1 and IE8 cover every report Input Evaluation receives.
+# IE1 — Criterion Evaluation
 
-### IE2 - Inspectable Evidence
+## IE1.1 — Criterion Coverage
 
-**Parent:** R3, R3.1  
-**Requirement:** Each criterion finding shall cite at least one inspectable evidence item or source reference and preserve its connection to the originating report content. Every quotation shall match the report text exactly, and every source reference shall resolve to the cited content.  
-**Method:** Test; Inspection  
-**Verification:**
+### Requirement
 
-1. Test: for every finding in the criterion test set, check that at least one evidence item or source reference is present, that each quotation matches the originating report text exactly, and that each reference resolves to the cited content.
-2. Inspection: inspect the approved evidence-verification sample defined in the verification plan (E11) and determine whether the cited evidence supports the stated finding, including findings based on missing information.
+For each accepted report, the Input Evaluation subsystem shall produce exactly one criterion finding for every published quality criterion.
 
-**Pass:** Every tested finding cites evidence connected to the correct report; every quotation matches exactly and every reference resolves; and every inspected finding's evidence supports the stated finding.
+### Rationale
 
-### IE3 - Unevaluated Criteria
+The published criteria collectively define the required bug-report quality evaluation. Missing a criterion produces an incomplete evaluation, while duplicate findings for the same criterion can create ambiguity.
 
-**Parent:** R4, R4.1, R4.2, R4.3  
-**Requirement:** For each processable report, Input Evaluation shall identify every criterion it could not evaluate and state the reason. When it reaches a conclusion for every criterion, it shall explicitly state that no criterion remains unevaluated.  
-**Method:** Test  
-**Verification:** Process three groups of test reports: reports with intentionally non-evaluable criteria; reports in which required information is simply missing; and control reports for which every criterion can be evaluated.  
-**Pass:** Every non-evaluable criterion is reported as unevaluated with a reason; no unevaluated criterion is presented as a conclusion; missing information is reported as a conclusion, not as unevaluated; and every control report states that no criterion remains unevaluated.
+### Source
 
-### IE4 - Checkable-Claim Recall
+R1 — The system shall evaluate every incoming bug report against the quality criteria.
 
-**Parent:** R7.1 and its Input Evaluation allocation  
-**Requirement:** Input Evaluation shall identify at least 80% of the checkable claims labeled in the historical evaluation.  
-**Method:** Test; Analysis  
-**Verification:** Run Input Evaluation on the approved historical claim set (E10). Compare identified claims with human-labeled reference claims using the approved claim-matching rule (E11). Calculate recall as matched reference claims divided by total reference claims.  
-**Pass:** Claim recall is at least 80%.
+### Verification Method
 
-The 80% value comes directly from R7.1. Input Evaluation did not select it, and any change to it requires a system-level requirement change. Claim precision is not specified by R7.1; see Section 8.3.
+Test
 
-### IE5 - Claim Identification and Traceability
+### Verification
 
-**Parent:** R7 Input Evaluation allocation  
-**Supports:** R7.3 (claim findings quote the report passage) and R7.5 (claims are checked against a named project version). Claim Investigation performs both, using the context Input Evaluation preserves.  
-**Requirement:** Input Evaluation shall assign each identified claim a unique identifier and preserve its exact claim text, source report reference, project identifier, relevant report context, and any project version named in the report.  
-**Method:** Test; Inspection  
-**Verification:** Process reports containing multiple claims, including reports that name a project version. Using only the information Input Evaluation exposes, distinguish each claim and locate its source passage, report, project, context, and named version. Verify identifier uniqueness using the scope defined by the approved interface contract (OI-8).  
-**Pass:** Every identified claim in the test set has an identifier that is unique within the scope defined by the approved interface contract, an exact claim text that matches the report, and the correct report, project, context, and named version when one is given.
+Process representative accepted reports and compare the generated criterion findings with the published quality-criterion list.
 
-### IE6 - Criterion-Finding Handoff
+### Acceptance Criterion
 
-**Parent:** R2, R2.1, and the R2 Input Evaluation allocation  
-**Requirement:** Input Evaluation shall provide every criterion finding, its evidence basis, and any unevaluated reason to Integration in the agreed interface format.  
-**Method:** Test (interface)  
-**Verification:** Compare the findings Input Evaluation generates with the records available at the Input Evaluation-to-Integration boundary.  
-**Pass:** Every generated finding is available at the boundary with its evidence basis and any unevaluated reason.
+For each accepted verification report:
 
-### IE7 - Investigation-Request Handoff
+- 100% of published quality criteria shall be represented; and
+- each criterion shall have exactly one corresponding finding.
 
-**Parent:** R7 Input Evaluation allocation  
-**Requirement:** For every identified claim, Input Evaluation shall provide that claim and the report context required by the approved downstream interface to Integration for transfer to Claim Investigation.  
-**Method:** Test (interface)  
-**Verification:** Process reports containing multiple claims and validate the information made available at the downstream boundary against the approved downstream interface contract (OI-7).  
-**Pass:** Every identified claim is represented exactly once in the information made available at the downstream boundary, and all required context satisfies the approved interface contract.
+---
 
-### IE8 - Unprocessable Input
+## IE1.2 — Finding Evidence
 
-**Parent:** R8 Input Evaluation allocation  
-**Requirement:** Input Evaluation shall validate each received report against the approved input contract. For each contract-invalid input, it shall return an explicit error or unevaluated result stating why the input could not be processed, and shall not represent the input as a normally completed evaluation.  
-**Method:** Test (interface)  
-**Verification:** Submit test inputs that each violate one required condition of the Integration-to-Input Evaluation interface contract (E7).  
-**Pass:** Every contract-invalid test input produces an explicit error or unevaluated result with a reason, and none appears as a normally completed evaluation.
+### Requirement
 
-### IE9 - No Cross-Report Reporter Record
+Each criterion finding shall include an inspectable evidence basis traceable to the originating report.
 
-**Parent:** R6 Input Evaluation allocation  
-**Requirement:** Input Evaluation shall not create or retain records that associate a reporter with more than one submission.  
-**Method:** Inspection; Test  
-**Verification:** Submit multiple reports, including several from the same reporter. Inspect Input Evaluation outputs and every record stored by Input Evaluation.  
-**Pass:** No inspected Input Evaluation output or stored record associates one reporter with more than one submission.
+### Rationale
 
-### IE10 - Historical-Evaluation Comparability
+A finding must have an inspectable basis so that its conclusion can be reviewed rather than treated as an unsupported assertion. This applies both when relevant information is present and when a finding is based on the absence of required information.
 
-**Parent:** R5 Input Evaluation allocation  
-**Requirement:** Each criterion finding produced for the historical evaluation shall be matchable to the corresponding human-labeled reference unit required by the approved system evaluation procedure.  
-**Method:** Test; Analysis  
-**Verification:** Run Input Evaluation on the historical evaluation set (E10) and apply the approved matching procedure.  
-**Pass:** Every criterion finding for a processable historical report is matched to the correct reference unit.
+### Source
 
-This requirement supports the system-level accuracy, coverage, and negative-finding tests in R5.1-R5.3. It does not assign those system targets to Input Evaluation alone.
+R3 — Every finding shall cite the evidence that supports it, in a form the maintainer can inspect.
 
-### IE11 - Result Provenance
+### Verification Method
 
-**Parent:** R9.3 Input Evaluation allocation  
-**Requirement:** Each completed Input Evaluation output shall record the version of the quality criteria and every external model used to produce its findings.  
-**Method:** Inspection; Test  
-**Verification:** Inspect completed test outputs and check whether the criteria version and every external model version used can be identified.  
-**Pass:** Every completed test output records the criteria version and all external model versions used.
+Inspection / Test
 
-## 6. Design and Interface Decisions
+### Verification
 
-These are the current ways of satisfying the requirements. They are not additional subsystem requirements and may change without changing the requirements, provided the replacement still satisfies them.
+Inspect criterion findings from representative reports and determine whether each finding contains an evidence basis that can be associated with the originating report.
 
-| Current decision | Requirement supported |
+### Acceptance Criterion
+
+100% of criterion findings shall contain an inspectable evidence basis traceable to the correct originating report.
+
+---
+
+## IE1.3 — Unevaluated Criterion Reporting
+
+### Requirement
+
+For each accepted report, the Input Evaluation subsystem shall identify every unevaluated quality criterion and provide a reason for each unevaluated criterion.
+
+### Rationale
+
+An inability to evaluate a criterion is different from determining that the criterion is satisfied, missing, insufficient, or not applicable. Explicit reporting prevents an unevaluated criterion from being mistaken for a valid evaluation result.
+
+### Source
+
+R4 — Every system output shall state what the system could not check.
+
+### Verification Method
+
+Test
+
+### Verification
+
+Process reports intentionally constructed so that selected criteria cannot be evaluated.
+
+### Acceptance Criterion
+
+100% of intentionally unevaluated criteria shall be explicitly identified with a reason.
+
+---
+
+# IE2 — Checkable Claim Identification
+
+## IE2.1 — Claim Identification Recall
+
+### Requirement
+
+The Input Evaluation subsystem shall achieve a claim recall of at least 80% on the approved human-labeled historical claim-evaluation set.
+
+### Rationale
+
+Downstream investigation can investigate only claims that Input Evaluation successfully identifies. A recall threshold establishes a measurable minimum level of claim-identification coverage without prescribing how claims are identified.
+
+### Source
+
+Derived subsystem requirement — pending explicit system-level allocation.
+
+### Verification Method
+
+Analysis / Test
+
+### Verification
+
+Run Input Evaluation on the approved human-labeled historical claim-evaluation set.
+
+Compare identified claims with reference claims using the approved claim-matching rule.
+
+Calculate:
+
+**Claim Recall = Matched Reference Claims / Total Reference Claims**
+
+### Acceptance Criterion
+
+Claim recall shall be greater than or equal to 80%.
+
+### Baseline Note
+
+The 80% threshold is the current subsystem draft target and requires system-level approval before formal baselining.
+
+---
+
+# IE3 — Claim Traceability
+
+## IE3.1 — Claim Traceability
+
+### Requirement
+
+Each identified claim produced at the Input Evaluation subsystem boundary shall be unambiguously traceable to its originating report and source content.
+
+### Rationale
+
+A report may contain multiple claims, and those claims may later be processed by multiple subsystems. Traceability prevents claims from being confused, detached from their original context, or associated with the wrong report.
+
+### Source
+
+Derived subsystem requirement — pending explicit system-level allocation.
+
+### Verification Method
+
+Inspection / Test
+
+### Verification
+
+Process reports containing multiple claims and attempt to associate every identified claim with its originating report and source content using only information available at the Input Evaluation subsystem boundary.
+
+### Acceptance Criterion
+
+100% of identified claims shall be traceable to the correct originating report and source content.
+
+---
+
+# IE4 — Downstream Output Availability
+
+## IE4.1 — Criterion Finding Availability
+
+### Requirement
+
+The Input Evaluation subsystem shall make every generated criterion finding available at its downstream subsystem boundary.
+
+### Rationale
+
+Criterion findings cannot contribute to downstream system processing or the maintainer-facing output if they remain internal to Input Evaluation.
+
+### Source
+
+Derived from R2 through subsystem allocation.
+
+R2 — The system shall present the findings for each report to the maintainer.
+
+### Verification Method
+
+Interface Test
+
+### Verification
+
+Compare the criterion findings generated internally by Input Evaluation with the findings exposed at the downstream subsystem boundary.
+
+### Acceptance Criterion
+
+100% of generated criterion findings shall be available at the downstream subsystem boundary.
+
+---
+
+## IE4.2 — Investigation Package Availability
+
+### Requirement
+
+The Input Evaluation subsystem shall make one investigation package available at its downstream subsystem boundary for every identified claim.
+
+### Rationale
+
+Claim identification has no downstream value if the identified claim and the information required for investigation cannot leave the subsystem.
+
+Defining the required contents through the approved interface contract avoids embedding design-specific fields in the behavioral requirement.
+
+### Source
+
+Derived subsystem requirement — pending explicit system-level allocation.
+
+### Verification Method
+
+Interface Test
+
+### Verification
+
+Process reports containing multiple identified claims and compare the internally identified claims with the investigation packages exposed at the downstream subsystem boundary.
+
+### Acceptance Criterion
+
+100% of identified claims shall have a corresponding investigation package that satisfies the approved downstream interface contract.
+
+---
+
+# IE5 — Input Robustness
+
+## IE5.1 — Contract-Invalid Input Handling
+
+### Requirement
+
+For each contract-invalid input, the Input Evaluation subsystem shall return an explicit non-normal processing outcome instead of reporting a normally completed evaluation.
+
+### Rationale
+
+Malformed or unsupported inputs must not produce normal-looking outputs that could be mistaken for valid evaluations.
+
+This requirement makes invalid processing visible without prescribing a particular error format or implementation mechanism.
+
+### Source
+
+Derived subsystem requirement — pending explicit system-level robustness allocation.
+
+### Verification Method
+
+Interface Test / Test
+
+### Verification
+
+Submit verification inputs that intentionally violate required conditions of the approved input-interface contract.
+
+### Acceptance Criterion
+
+100% of contract-invalid verification inputs shall produce an explicit non-normal processing outcome and shall not be reported as normally completed evaluations.
+
+---
+
+## IE5.2 — Style-Variation Robustness
+
+### Requirement
+
+The Input Evaluation subsystem shall achieve criterion-finding agreement at or above the approved style-variation threshold on the approved style-variation test set.
+
+### Rationale
+
+Criterion findings should depend primarily on the technical content of a bug report rather than superficial differences in grammar, formatting, or writing style.
+
+### Source
+
+Derived subsystem requirement — pending explicit system-level robustness allocation.
+
+### Verification Method
+
+Analysis / Test
+
+### Verification
+
+Evaluate the approved style-variation pairs under the same evaluation configuration and calculate criterion-level agreement using the approved comparison rule.
+
+### Acceptance Criterion
+
+Criterion-level agreement shall be greater than or equal to the approved style-variation threshold.
+
+### TBR
+
+**TBR-IE-01:** Style-variation agreement threshold.
+
+This value must be approved before formal verification.
+
+---
+
+# IE6 — Reporter Privacy and Identity Independence
+
+## IE6.1 — Cross-Report Reporter Privacy
+
+### Requirement
+
+The Input Evaluation subsystem shall not create or retain a cross-report reporter profile based on reporter identity.
+
+### Rationale
+
+Input Evaluation is intended to evaluate bug-report content rather than contributor history. Reporter profiling is unnecessary for this function and may introduce privacy concerns or reporter-specific treatment.
+
+### Source
+
+R6 — The system shall not compile information about individual people across reports.
+
+### Verification Method
+
+Inspection / Test
+
+### Verification
+
+Process multiple reports, including multiple reports from the same contributor, and inspect Input Evaluation outputs, persistent state, and subsystem-controlled records within the approved verification scope.
+
+### Acceptance Criterion
+
+No inspected Input Evaluation artifact shall contain a cross-report reporter profile based on reporter identity.
+
+---
+
+## IE6.2 — Reporter Identity Independence
+
+### Requirement
+
+The Input Evaluation subsystem shall achieve criterion-finding agreement at or above the approved identity-independence threshold on the approved identity-variation test set.
+
+### Rationale
+
+Bug-report quality should be evaluated from report content rather than reporter identity.
+
+### Source
+
+Derived from R6 — pending system-level approval.
+
+### Verification Method
+
+Analysis / Test
+
+### Verification
+
+Evaluate approved identity-variation pairs under the same evaluation configuration and compare their criterion findings.
+
+### Acceptance Criterion
+
+Criterion-level agreement shall be greater than or equal to the approved identity-independence threshold.
+
+### TBR
+
+**TBR-IE-02:** Identity-independence agreement threshold.
+
+This value must be approved before formal verification.
+
+---
+
+# IE7 — Evaluation Support and Provenance
+
+## IE7.1 — Historical Evaluation Comparability
+
+### Requirement
+
+Each criterion finding generated for the approved historical evaluation set shall be unambiguously matchable to the corresponding human-labeled reference unit required by the approved system evaluation procedure.
+
+### Rationale
+
+System-level accuracy and other evaluation metrics cannot be calculated unless subsystem outputs can be associated consistently with the corresponding human reference results.
+
+### Source
+
+Derived from R5.
+
+R5 — The system shall be more accurate than the baseline in the historical evaluation.
+
+### Verification Method
+
+Analysis / Test
+
+### Verification
+
+Run Input Evaluation on the approved historical evaluation set and attempt to match every criterion finding with the corresponding human-labeled reference unit.
+
+### Acceptance Criterion
+
+100% of criterion findings generated for accepted historical-evaluation reports shall be matchable to their corresponding reference units.
+
+---
+
+## IE7.2 — Criteria-Version Provenance
+
+### Requirement
+
+Each completed Input Evaluation result shall identify the quality-criteria version used to produce the result.
+
+### Rationale
+
+Evaluation behavior may change when quality-criterion definitions change. Recording the criteria version supports reproducibility, interpretation of historical results, debugging, and comparison between system versions.
+
+### Source
+
+Derived subsystem requirement — pending explicit system-level provenance allocation.
+
+### Verification Method
+
+Inspection / Test
+
+### Verification
+
+Inspect representative completed Input Evaluation results and determine the quality-criteria version used to generate each result.
+
+### Acceptance Criterion
+
+The quality-criteria version shall be determinable for 100% of completed verification results.
+
+---
+
+## IE7.3 — External-Model Provenance
+
+### Requirement
+
+Each completed Input Evaluation result produced using an external model shall identify the external model configuration required by the approved provenance definition.
+
+### Rationale
+
+Evaluation behavior may change when the external model or its configuration changes. Recording model provenance supports reproducibility, debugging, interpretation of historical results, and comparison between evaluation runs.
+
+### Source
+
+Derived subsystem requirement — pending explicit system-level provenance allocation.
+
+### Verification Method
+
+Inspection / Test
+
+### Verification
+
+Inspect representative completed results generated using an external model and determine whether the required model configuration can be identified.
+
+### Acceptance Criterion
+
+The required external-model configuration shall be determinable for 100% of applicable verification results.
+
+---
+
+# 4. Design and Interface Decisions
+
+The following are current architecture, design, or interface decisions and are intentionally **not subsystem requirements**.
+
+| Design / Interface Decision | Requirement Supported |
 |---|---|
-| Represent the required unique claim identifier with a `claim_id` field. The field name and format are design choices. | IE5, IE7 |
-| Use a structured interface record containing claim text, source reference, project identifier, context, and named version. | IE5, IE7 |
-| Represent a report with no identified claims explicitly in the handoff, so that "no claims identified" cannot be confused with a missing output. | IE7; supports R4.3 |
-| Use an agreed schema for Input Evaluation inputs and outputs, including concrete representations for unevaluated outcomes and errors. | IE3, IE6-IE8 |
-| Choose the transport mechanism used to hand records to Integration (for example, a function call, an API, or files). | IE6, IE7 |
-| Choose the model, prompt, algorithm, language, and storage mechanism during implementation. | Implementation choice |
+| Assign a unique `claim_id` to each identified claim. | IE3.1 |
+| Preserve the exact claim text in the downstream interface record. | IE3.1 |
+| Preserve a source-report reference. | IE3.1 |
+| Define required investigation-context fields in the downstream interface contract. | IE4.2 |
+| Route current Input Evaluation outputs through Integration. | IE4.1, IE4.2 |
+| Current downstream architecture is Input Evaluation → Integration → Claim Investigation. | IE4.1, IE4.2 |
+| Use an agreed structured representation for subsystem inputs and outputs. | IE4, IE5 |
+| Define concrete representations for non-normal processing outcomes. | IE5.1 |
+| Select the model, prompt, algorithm, or software implementation used to perform evaluation. | Implementation |
+| Define concrete provenance field names. | IE7.2, IE7.3 |
 
-## 7. Evidence Record
+A design decision may change without changing the underlying requirement, provided the replacement design continues to satisfy that requirement.
 
-Each row links the evidence behind a requirement or decision. Rows marked TBD have no evidence yet and are tracked as open items.
+---
 
-| ID | Evidence | Supports | Link | Status |
-|---|---|---|---|---|
-| E1 | System Requirements R1-R9 with subsystem allocations | All flow-down in Section 4 | [Google Doc](https://docs.google.com/document/d/16a4n3GOQUCMJNqrWSI4KCzBsWQk-W8XhA2J3N4qtpGE/edit?tab=t.0) | Draft; no version identifier; reviewed 2026-10-29 (OI-1) |
-| E2 | System-level definitions | Section 3 | [system-requirements.md](system-requirements.md) | Exists |
-| E3 | ConOps and architecture records establishing subsystem responsibilities | Why each function is allocated to Input Evaluation | TBD | Not yet located (OI-2) |
-| E4 | Quality criteria C1-C7 and rating scale | IE1-IE3 | [bug-report-quality-criteria.md](../bug-report-quality-criteria.md) | Exists; no version identifier (OI-9) |
-| E5 | Manual calibration record: two independent evaluators rated 10 reports from 5 projects; 6 disagreements recorded and resolved | Criteria definitions in E4 | [Calibration Record](../bug-report-quality-criteria.md#calibration-record) and [Final Criteria Decisions](../bug-report-quality-criteria.md#final-criteria-decisions) | Exists |
-| E6 | Published research supporting each criterion | Criteria definitions in E4 | TBD | E4 states that criteria are revised using relevant research but does not yet cite sources (OI-9) |
-| E7 | Integration-to-Input Evaluation interface agreement | IE6, IE8, definition of processable report | [evaluation-integration-interface agreement.md](../Interface%20Agreemtn/evaluation-integration-interface%20agreement.md) | Draft; approval required (OI-6) |
-| E8 | Input Evaluation-to-Integration investigation-request interface | IE7 | TBD | Not yet drafted (OI-7) |
-| E9 | Input Evaluation working agreement, including how decisions are made and recorded | Decision process | [input-evaluation.md](../subsystem-working-agreements/input-evaluation.md) | Exists |
-| E10 | Human-labeled historical reports and claim labels | IE4, IE10 | TBD | Owner to be confirmed (OI-11) |
-| E11 | Verification plan: criterion test set, evidence-verification sample and sampling procedure, invalid-input cases, claim-matching rule | IE1-IE8 | TBD | Not yet drafted (OI-11) |
-| E12 | Decision records for significant requirement or design changes | Decision process | TBD | None yet; Section 10 lists the changes that need records |
+# 5. Verification Assets Required Before Formal Verification
 
-## 8. Unresolved System-Level Issues
+The following assets shall be approved or baselined before the associated requirements are formally verified:
 
-The following statements appear in the current system requirements but cannot yet be turned into verifiable Input Evaluation requirements. Input Evaluation will not invent replacement values.
+1. published quality-criterion set;
+2. quality-criteria version definition;
+3. Input Evaluation input-interface contract;
+4. downstream interface contract;
+5. human-labeled historical criterion-evaluation set;
+6. human-labeled historical claim-evaluation set;
+7. claim-matching rule;
+8. style-variation test set;
+9. identity-variation test set;
+10. criterion-finding comparison rule;
+11. historical system-evaluation procedure;
+12. provenance definition;
+13. applicable performance thresholds.
 
-### 8.1 Style-Variation Threshold
+---
 
-The R8 allocation requires consistent findings for semantically equivalent reports whose formatting or writing style differs, "subject to the system-level threshold in R9.3." R9.3 defines provenance, not a threshold. The system-level requirements owner needs to correct the reference and define the comparison rule and threshold (OI-3).
+# 6. Traceability Summary
 
-### 8.2 Identity-Independence Threshold
+## Current System Requirements
 
-The R6 allocation requires the same findings when reporter-identifying information is replaced with placeholders, "subject to the system-level threshold in R6.1." R6.1 does not exist. R6 contains an unnumbered statement ("The system shall keep no record that associates a reporter with more than one submission"), but it defines no threshold. The system-level requirements owner needs to add R6.1 or correct the reference (OI-4).
-
-### 8.3 Claim Precision
-
-R7.1 specifies claim recall but no precision or false-positive limit, so Input Evaluation does not set one. Over-identification still has a system-level cost: R7.2 requires one finding for every identified claim, so over-identification increases downstream investigation work. It may also affect system evaluation metrics such as R5.2 coverage, depending on how the approved system evaluation procedure defines them. The system-level team, Input Evaluation, and Claim Investigation should decide whether a precision requirement is needed (OI-5).
-
-### 8.4 System Requirements Affected by Input Evaluation but Not Allocated
-
-The following system requirements have no Input Evaluation allocation, but Input Evaluation's behavior may affect whether the system meets them. Input Evaluation will not set its own budgets for them. The system-level requirements owner should decide whether an allocation is needed (OI-12).
-
-| System requirement | How Input Evaluation may affect it |
+| System Requirement | Input Evaluation Allocation |
 |---|---|
-| R2.2: 95% of outputs within 15 minutes | Input Evaluation processing time uses part of this budget. |
-| R5.2, R5.3: coverage of at least 80%; at least 90% (TBR-5) of negative findings correct | Unevaluated criteria and "missing" conclusions may affect the R5.2 coverage and R5.3 negative-finding metrics. The approved system evaluation procedure must define how these outcomes are counted. |
-| R8.1: deliver an output when a source the system depends on is unavailable | If the selected Input Evaluation implementation depends on an external model or another source that can become unavailable, the system-level owner should determine whether Input Evaluation needs a specific fallback allocation under R8.1. |
-| R9.2: two runs within 2 percentage points | If Input Evaluation uses an external model, run-to-run variation in its output may affect the reproducibility of criterion findings. |
+| R1 — Evaluate every incoming bug report against the quality criteria | IE1.1 |
+| R2 — Present findings for each report to the maintainer | IE4.1 |
+| R3 — Every finding shall cite inspectable evidence | IE1.2 |
+| R4 — Every system output shall state what could not be checked | IE1.3 |
+| R5 — The system shall be more accurate than the baseline in historical evaluation | IE7.1 |
+| R6 — The system shall not compile information about individual people across reports | IE6.1; IE6.2 is derived |
 
-## 9. Open Items Before Baseline
+## Derived Requirements Pending Explicit System-Level Allocation
 
-SSE refers to the system-level requirements owner; the name is to be confirmed. Target dates are TBD unless an owner has confirmed one. The README sets Gate 2 on 2026-12-07 and requires finished interface agreements at Gate 2, so OI-6 and OI-7 carry that date as a proposed target.
+The following requirements do not yet map to an explicit numbered requirement in the current system-requirements artifact:
 
-| ID | Open item / required action | Owner | Target | Status |
-|---|---|---|---|---|
-| OI-1 | Complete the Gate 1 rework, approve R1-R9 as the system baseline, and give it a version identifier. | SSE | TBD | Open |
-| OI-2 | Locate and link the ConOps and architecture records that establish the Input Evaluation allocation (E3). | SSE, with Input Evaluation | TBD | Open |
-| OI-3 | Correct the R8 style-variation reference to R9.3 and define the comparison rule and threshold. | SSE | TBD | Open |
-| OI-4 | Add the missing R6.1 identity-independence threshold or correct the R6 reference. | SSE | TBD | Open |
-| OI-5 | Decide whether claim precision or a false-positive limit is required in addition to R7.1. | SSE, Input Evaluation, Claim Investigation | TBD | Open |
-| OI-6 | Review and approve the Integration-to-Input Evaluation interface agreement (E7), naming one owner from each subsystem. | Input Evaluation and Integration | Proposed: before Gate 2 (2026-12-07), pending owner confirmation | Draft exists |
-| OI-7 | Define and approve the investigation-request interface. Claim Investigation validates each claim record against its own input contract and rejects invalid records, so it must review this interface. | Input Evaluation, Integration, Claim Investigation | Proposed: before Gate 2 (2026-12-07), pending owner confirmation | Open |
-| OI-8 | Confirm that the unique claim identifier is an interface constraint and define its uniqueness scope (for example, within a report, a run, a project, or the whole system). Both the Input Evaluation and Claim Investigation allocations under R7 reference it. The field name and format remain design choices. | SSE, Claim Investigation | TBD | Open |
-| OI-9 | Give the quality-criteria document (E4) a version identifier and cite the research sources behind each criterion (E6). | Input Evaluation | TBD | Open |
-| OI-10 | Define how each rating-scale value (P, M, N/A, U) maps to a concluded or unevaluated outcome. U currently covers both contradictory information and inaccessible evidence, and the mapping affects R4 reporting and R5.2 coverage. | Input Evaluation | TBD | Open |
-| OI-11 | Draft the verification plan (E11) and obtain the historical evaluation set (E10). | Input Evaluation for E11; owner of E10 to be confirmed | TBD | Open |
-| OI-12 | Decide whether R2.2, R5.2, R5.3, R8.1, and R9.2 need an Input Evaluation allocation (Section 8.4). | SSE, with Input Evaluation | TBD | Open |
+- IE2.1 — Claim Identification Recall
+- IE3.1 — Claim Traceability
+- IE4.2 — Investigation Package Availability
+- IE5.1 — Contract-Invalid Input Handling
+- IE5.2 — Style-Variation Robustness
+- IE6.2 — Reporter Identity Independence
+- IE7.2 — Criteria-Version Provenance
+- IE7.3 — External-Model Provenance
 
-Until these items are resolved, affected values and references will remain open rather than being invented by Input Evaluation.
+These requirements shall remain identified as **derived subsystem requirements** until their system-level allocation is formally approved.
 
-## 10. Change History
+---
 
-| Date | Change | Reference |
-|---|---|---|
-| 2026-10-05 | First draft of Input Evaluation subsystem requirements. | Commit `8057f42` |
-| 2026-10-16 | Added verification methods and draft tests. | Commit `e69ca81` |
-| 2026-10-18 | Moved the file into `documentation/System Requirement/`. | Commit `2514238` |
-| 2026-10-27 | Revised requirements, separated requirements from design decisions, and listed derived requirements pending allocation. | Commit `7ce07ea` |
-| 2026-10-29 | Re-derived every requirement from the subsystem allocations in the R1-R9 system requirements draft. Renumbered requirements IE1-IE11. Added key terms, R3.1 evidence matching, the explicit unique claim identifier, verification methods, and an evidence record. Moved the style and identity requirements to Section 8 until their system-level thresholds exist. Replaced unconfirmed due dates with TBD. | This pull request |
+# 7. Open Decisions Before Baseline
+
+## OD-1 — Claim Recall Threshold
+
+Confirm whether the current 80% claim-recall target is approved as the subsystem performance threshold.
+
+---
+
+## OD-2 — Claim Precision / False Positives
+
+Determine whether Input Evaluation requires an additional claim-precision or false-positive requirement.
+
+No threshold shall be introduced until the corresponding system-level need is agreed.
+
+---
+
+## OD-3 — Style-Variation Threshold
+
+Approve the threshold required for IE5.2.
+
+Reference: **TBR-IE-01**.
+
+---
+
+## OD-4 — Identity-Independence Threshold
+
+Approve the threshold required for IE6.2.
+
+Reference: **TBR-IE-02**.
+
+---
+
+## OD-5 — System Requirement Allocation
+
+Determine whether the derived claim-identification, traceability, robustness, identity-independence, and provenance requirements require explicit system-level requirements or formal subsystem allocation.
+
+---
+
+## OD-6 — Interface Baseline
+
+Finalize and approve the upstream and downstream Input Evaluation interface contracts before formal interface verification.
+
+---
+
+# 8. Requirement–Design Separation
+
+A **requirement** describes an externally observable capability, constraint, or measurable performance outcome that must remain true regardless of the implementation selected.
+
+Examples:
+
+- achieve the approved claim-recall threshold;
+- preserve claim traceability;
+- produce one finding per criterion;
+- prevent contract-invalid input from appearing as a normally completed evaluation.
+
+A **design decision** describes how the subsystem satisfies a requirement.
+
+Examples:
+
+- assign a `claim_id`;
+- use JSON;
+- use an LLM;
+- use a particular prompt;
+- use Python;
+- route outputs through Integration.
+
+A statement should normally remain outside the subsystem requirements if it could change solely because the implementation changes while the required subsystem behavior remains unchanged.
